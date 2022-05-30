@@ -895,7 +895,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -1018,7 +1018,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74f89d248799e3f15f91b70917f65381062a01bb8e222700ea0e5a7ff9785f9c"
 dependencies = [
  "byteorder",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -1809,7 +1809,7 @@ dependencies = [
  "prisma-value",
  "serde",
  "serde_json",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -4473,7 +4473,7 @@ dependencies = [
  "trust-dns-proto",
  "trust-dns-resolver",
  "typed-builder",
- "uuid",
+ "uuid 0.8.2",
  "webpki-roots",
 ]
 
@@ -4529,7 +4529,7 @@ dependencies = [
  "tracing",
  "tracing-futures",
  "user-facing-errors",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -4626,7 +4626,7 @@ dependencies = [
  "tokio-util 0.6.9",
  "twox-hash",
  "url",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -4663,7 +4663,7 @@ dependencies = [
  "subprocess",
  "thiserror",
  "time 0.3.9",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -5704,7 +5704,7 @@ dependencies = [
  "postgres-protocol",
  "serde",
  "serde_json",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -5799,7 +5799,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "thiserror",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -5816,7 +5816,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -5989,7 +5989,7 @@ dependencies = [
  "tracing",
  "tracing-core",
  "url",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -6009,7 +6009,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "user-facing-errors",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -6049,7 +6049,7 @@ dependencies = [
  "tracing-futures",
  "url",
  "user-facing-errors",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -6618,7 +6618,7 @@ dependencies = [
  "tokio",
  "ts-rs",
  "uhlc",
- "uuid",
+ "uuid 0.8.2",
  "walkdir",
  "webp",
 ]
@@ -6707,9 +6707,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.136"
+version = "1.0.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce31e24b01e1e524df96f1c2fdd054405f8d7376249a5110886fb4b658484789"
+checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
 dependencies = [
  "serde_derive",
 ]
@@ -6725,9 +6725,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.136"
+version = "1.0.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08597e7152fcd306f41838ed3e37be9eaeed2b61c42e2117266a554fab4662f9"
+checksum = "1f26faba0c3959972377d3b2d306ee9f71faee9714294e41bb777f83f88578be"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6736,9 +6736,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.79"
+version = "1.0.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e8d9fa5c3b304765ce1fd9c4c8a3de2c8db365a5b91be52f186efc675681d95"
+checksum = "9b7ce2b32a1aed03c558dc61a5cd328f15aff2dbc17daad8fb8af04d2100e15c"
 dependencies = [
  "indexmap",
  "itoa 1.0.1",
@@ -7096,6 +7096,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sql-crdt"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "uuid 1.1.0",
+]
+
+[[package]]
 name = "sql-datamodel-connector"
 version = "0.1.0"
 source = "git+https://github.com/Brendonovich/prisma-engines?rev=5d34c9a567aaec4065a48d8cf6c2ee885e6ca281#5d34c9a567aaec4065a48d8cf6c2ee885e6ca281"
@@ -7136,7 +7145,7 @@ dependencies = [
  "tracing-futures",
  "tracing-opentelemetry",
  "user-facing-errors",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -7501,7 +7510,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "url",
- "uuid",
+ "uuid 0.8.2",
  "windows 0.30.0",
 ]
 
@@ -7536,7 +7545,7 @@ dependencies = [
  "sha2 0.10.2",
  "tauri-utils",
  "thiserror",
- "uuid",
+ "uuid 0.8.2",
  "walkdir",
 ]
 
@@ -7568,7 +7577,7 @@ dependencies = [
  "serde_json",
  "tauri-utils",
  "thiserror",
- "uuid",
+ "uuid 0.8.2",
  "webview2-com",
  "windows 0.30.0",
 ]
@@ -7583,7 +7592,7 @@ dependencies = [
  "rand 0.8.5",
  "tauri-runtime",
  "tauri-utils",
- "uuid",
+ "uuid 0.8.2",
  "webview2-com",
  "windows 0.30.0",
  "wry",
@@ -7720,7 +7729,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.6.9",
  "tracing",
- "uuid",
+ "uuid 0.8.2",
  "winauth",
 ]
 
@@ -8121,7 +8130,7 @@ dependencies = [
  "lazy_static",
  "log",
  "serde",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -8256,6 +8265,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
  "getrandom 0.2.6",
+ "serde",
+]
+
+[[package]]
+name = "uuid"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93bbc61e655a4833cf400d0d15bf3649313422fa7572886ad6dab16d79886365"
+dependencies = [
  "serde",
 ]
 
