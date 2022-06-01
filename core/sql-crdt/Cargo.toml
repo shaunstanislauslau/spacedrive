@@ -3,9 +3,15 @@ name = "sql-crdt"
 version = "0.1.0"
 edition = "2021"
 
+[[test]]
+name = "sql-crdt"
+path = "tests/lib.rs"
+harness = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
-uuid = { version = "1.1.0", features = ["serde"] }
+uhlc = { version = "0.4.1" }
+uuid = { version = "1.1.0", features = ["serde", "v4"] }

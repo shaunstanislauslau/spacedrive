@@ -23,7 +23,7 @@ use uuid::Uuid;
 ///
 /// ## Delete
 /// Deleting many relations use the operation's `relation`, `relation_item` and `relation_group` to identify the relation and delete it.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ManyRelationOperation {
 	pub relation_item: Uuid,
 	pub relation_group: Uuid,
@@ -32,7 +32,7 @@ pub struct ManyRelationOperation {
 	pub data: ManyRelationOperationData,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum ManyRelationOperationData {
 	Create,
