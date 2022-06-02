@@ -7,6 +7,7 @@ import { Heart, Link } from 'phosphor-react';
 import React from 'react';
 
 import { default as types } from '../../constants/file-types.json';
+import { useExplorerState } from './FileList';
 import FileThumb from './FileThumb';
 
 interface MetaItemProps {
@@ -33,6 +34,10 @@ export const Inspector = (props: { selectedFile?: FilePath; locationId: number }
 	// const { selectedRowIndex } = useExplorerState();
 	// const isOpen = !!props.selectedFile;
 
+	const { newThumbnails } = useExplorerState();
+
+	const hasNewThumbnail = !!newThumbnails[props.selectedFile?.file?.cas_id ?? ''];
+
 	const file_path = props.selectedFile;
 
 	return (
@@ -50,7 +55,7 @@ export const Inspector = (props: { selectedFile?: FilePath; locationId: number }
 					<div className="flex flex-col h-full overflow-hidden bg-white rounded-lg select-text dark:bg-gray-600 bg-opacity-70">
 						<div className="flex items-center justify-center w-full h-64 overflow-hidden rounded-t-lg bg-gray-50 dark:bg-gray-900">
 							<FileThumb
-								hasThumbnailOverride={false}
+								hasThumbnailOverride={hasNewThumbnail}
 								className="!m-0 flex flex-shrink flex-grow-0"
 								file={file_path}
 								locationId={props.locationId}

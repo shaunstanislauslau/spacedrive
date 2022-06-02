@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::{fs, io};
 use std::path::Path;
-
 use crate::job::JobReportUpdate;
 use crate::prisma::file;
 use crate::sys::get_location;
@@ -16,8 +15,8 @@ use prisma_client_rust::prisma_models::PrismaValue;
 use prisma_client_rust::raw::Raw;
 use prisma_client_rust::{raw, Direction};
 use serde::{Deserialize, Serialize};
-
 use super::checksum::generate_cas_id;
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FileCreated {
 	pub id: i32,
@@ -30,6 +29,8 @@ pub struct FileIdentifierJob {
 	pub path: String,
 }
 
+// The identifier job generates cas ids for files and creates unique file records.
+// Since the indexer has already taken care of inserting orphan file paths, this job can fail and pick up where it left off.
 #[async_trait::async_trait]
 impl Job for FileIdentifierJob {
 	fn name(&self) -> &'static str {
@@ -41,11 +42,10 @@ impl Job for FileIdentifierJob {
 		let location_path = location.path.unwrap_or("".to_string());
 
 		let total_count = count_orphan_file_paths(&ctx.core_ctx, location.id.into()).await?;
-
 		println!("Found {} orphan file paths", total_count);
-
+		
+		// Chunk the file paths into batches of 100
 		let task_count = (total_count as f64 / 100f64).ceil() as usize;
-
 		println!("Will process {} tasks", task_count);
 
 		// update job with total task count based on orphan file_paths count
@@ -53,7 +53,7 @@ impl Job for FileIdentifierJob {
 
 		let db = ctx.core_ctx.database.clone();
 
-		let ctx = tokio::task::spawn_blocking(move || {
+		let _ctx = tokio::task::spawn_blocking(move || {
 			let mut completed: usize = 0;
 			let mut cursor: i32 = 1;
 			// map cas_id to file_path ids
@@ -101,8 +101,6 @@ impl Job for FileIdentifierJob {
 					println!("Error inserting files: {}", e);
 					Vec::new()
 				});
-
-				println!("Unique files: {:?}" , files);
 
 				// assign unique file to file path
 				println!("Assigning {} unique file ids to origin file_paths", files.len());
@@ -156,8 +154,7 @@ impl Job for FileIdentifierJob {
 		})
 		.await?;
 
-		let remaining = count_orphan_file_paths(&ctx.core_ctx, location.id.into()).await?;
-
+		// let remaining = count_orphan_file_paths(&ctx.core_ctx, location.id.into()).await?;
 		Ok(())
 	}
 }
@@ -208,17 +205,16 @@ pub fn prepare_file_values(
 	let path = Path::new(&location_path).join(Path::new(file_path.materialized_path.as_str()));
 	// println!("Processing file: {:?}", path);
 	let metadata = fs::metadata(&path)?;
+	let size = metadata.len();
 	let cas_id = {
 		if !file_path.is_dir {
-			let mut ret = generate_cas_id(path.clone(), metadata.len()).unwrap();
-			ret.truncate(16);
+			let mut ret = generate_cas_id(path.clone(), size.clone()).unwrap();
+			ret.truncate(20);
 			ret
 		} else {
 			"".to_string()
 		}
 	};
 
-	println!("cas id for path {:?} is {:?}", path, cas_id);
-
-	Ok((cas_id.clone(), [PrismaValue::String(cas_id), PrismaValue::Int(0)]))
+	Ok((cas_id.clone(), [PrismaValue::String(cas_id), PrismaValue::Int(size.try_into().unwrap_or(0))]))
 }
