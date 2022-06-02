@@ -1,5 +1,11 @@
 {
 	"extends": "../../packages/config/interface.tsconfig.json",
 	"compilerOptions": {},
-	"include": ["src"]
+	"include": ["src", "vite-env.d.ts", "server", "renderer", "components", "pages"],
+	"ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
+  }
 }

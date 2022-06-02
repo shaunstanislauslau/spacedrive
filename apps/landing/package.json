@@ -2,10 +2,13 @@
 	"name": "@sd/landing",
 	"private": true,
 	"version": "0.0.0",
+	"type": "module",
 	"scripts": {
-		"dev": "vite",
-		"build": "vite build",
-		"serve": "vite preview"
+		"dev": "pnpm run server",
+		"prod": "pnpm run build && pnpm run server:prod",
+		"build": "vite build && vite build --ssr",
+		"server": "ts-node ./server",
+		"server:prod": "cross-env NODE_ENV=production ts-node ./server"
 	},
 	"dependencies": {
 		"@fontsource/inter": "^4.5.10",
