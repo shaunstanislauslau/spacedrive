@@ -138,12 +138,12 @@ impl Job for FileIdentifierJob {
 							// if there was already a file record for this cas_id we first search memory for the file id
 							match file_path_to_file.iter().find(|(_, _, cid)| *cid == *cas_id) {
 								Some((_, file_id, cas_id)) => {
-									println!("Found cas_id in memory {}", cas_id);
 									// we attempt again at assigning the file id to the file path
 									match block_on(assign_file(db.clone(), file_path_id, file_id)) {
 										Ok(_) => {}
 										Err(_) => {
-											// in this case there is still a conflict meaning this cas_id is already assigned to another file from outside this process, now we fall back to getting the cas_id from the database
+											// in this case there is still a conflict meaning this cas_id is already assigned
+											// to another file from outside this process, now we fall back to getting the cas_id from the database
 											println!("Couldn't find cas_id in memory, getting from database...");
 
 											#[derive(Deserialize, Serialize, Debug)]
@@ -168,28 +168,26 @@ impl Job for FileIdentifierJob {
 										"Error assigning file id {} to file path id {}",
 										file_id, file_path_id
 									);
-									continue;
 								}
 							}
 						}
 					}
-
-					// handle cursor
-					let last_row = file_paths.last().unwrap();
-					cursor = last_row.id;
-					completed += 1;
-
-					// update progress
-
-					ctx.progress(vec![
-						JobReportUpdate::CompletedTaskCount(completed),
-						JobReportUpdate::Message(format!(
-							"Processed {} of {} orphan files",
-							completed, task_count
-						)),
-					]);
 				}
+				// handle cursor
+				let last_row = file_paths.last().unwrap();
+				cursor = last_row.id;
+				completed += 1;
+
+				// update progress
+				ctx.progress(vec![
+					JobReportUpdate::CompletedTaskCount(completed),
+					JobReportUpdate::Message(format!(
+						"Processed {} of {} orphan files",
+						completed, task_count
+					)),
+				]);
 			}
+
 			ctx
 		})
 		.await?;
@@ -209,10 +207,6 @@ pub async fn assign_file(
 	file_path_id: &i32,
 	file_id: &i32,
 ) -> Result<Option<file_path::Data>, Error> {
-	println!(
-		"Assigning file id {} to file path id {}",
-		file_id, file_path_id
-	);
 	db.file_path()
 		.find_unique(file_path::id::equals(file_path_id.clone()))
 		.update(vec![file_path::file_id::set(Some(file_id.clone()))])
