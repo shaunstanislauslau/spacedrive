@@ -57,9 +57,10 @@ impl Job for FileIdentifierJob {
 			let mut completed: usize = 0;
 			let mut cursor: i32 = 1;
 			// map cas_id to file_path ids
-			let mut cas_id_lookup: HashMap<i32, String> = HashMap::new();
+			let mut cas_id_lookup: HashMap<String, (i32, i32)> = HashMap::new();
 
 			while completed < task_count {
+				// get the orphan file paths
 				let file_paths = block_on(get_orphan_file_paths(&ctx.core_ctx, cursor)).unwrap();
 				println!(
 					"Processing {:?} orphan files. ({} completed of {})",
@@ -68,15 +69,33 @@ impl Job for FileIdentifierJob {
 					task_count
 				);
 
+				// get the next file id
+				#[derive(Deserialize, Serialize, Debug)]
+				struct QueryRes {
+					id: Option<i32>,
+				}
+				let mut next_file_id = match block_on(db
+				._query_raw::<QueryRes>(raw!("SELECT MAX(id) id FROM files")))
+				{
+					Ok(rows) => rows[0].id.unwrap_or(0),
+					Err(e) => panic!("Error querying for next file id: {}", e),
+				};
+
 				// raw values to be inserted into the database
 				let mut values: Vec<PrismaValue> = Vec::new();
 
-				// only rows that have a valid cas_id to be inserted
+				// prepare unique file values for each file path
 				for file_path in file_paths.iter() {
-					match prepare_file_values(&location_path, file_path) {
+					let file_id = next_file_id.clone();
+					println!("Next file id: {}", file_id);
+					// get the values for this unique file
+					match prepare_file_values(&file_id, &location_path, file_path) {
 						Ok((cas_id, data)) => {
-							cas_id_lookup.insert(file_path.id, cas_id);
+							// add unique file id to cas_id lookup map
+							cas_id_lookup.insert(cas_id, (file_path.id, file_id));
+							// add values to raw query data
 							values.extend(data);
+							next_file_id += 1;
 						}
 						Err(e) => {
 							println!("Error processing file: {}", e);
@@ -90,57 +109,35 @@ impl Job for FileIdentifierJob {
 				}
 
 				println!("Inserting {} unique file records ({:?} values)", file_paths.len(), values.len());
-				
+				// insert files
 				let files: Vec<FileCreated> = block_on(db._query_raw(Raw::new(
 				  &format!(
-				    "INSERT INTO files (cas_id, size_in_bytes) VALUES {} ON CONFLICT (cas_id) DO NOTHING RETURNING id, cas_id",
-				    vec!["({}, {})"; file_paths.len()].join(",")
+				    "INSERT INTO files (id, cas_id, size_in_bytes) VALUES {} ON CONFLICT (cas_id) DO NOTHING RETURNING id, cas_id",
+				    vec!["({}, {}, {})"; file_paths.len()].join(",")
 				  ),
 				  values
 				))).unwrap_or_else(|e| {
 					println!("Error inserting files: {}", e);
 					Vec::new()
 				});
-
-				// assign unique file to file path
+				
 				println!("Assigning {} unique file ids to origin file_paths", files.len());
-				for (file_path_id, cas_id) in cas_id_lookup.iter() {
-					// get the cas id from the lookup table
-					let file = files.iter().find(|f| &f.cas_id == cas_id);
-					let file_id: i32;
-					if let Some(file) = file {
-						file_id = file.id;
-					} else {
-						let unique_file = match block_on(db.file().find_unique(file::cas_id::equals(cas_id.clone())).exec()) {
-							Ok(f) => match f {
-								Some(f) => f,
-								None => {
-									println!("Unique file does not exist, this shouldn't happen: {}", cas_id);
-									continue;
-								}
-							},
-							Err(e) => {
-								println!("Error finding unique file: {}", e);
-								continue;
-							}
-						};
-						file_id = unique_file.id;
-					}
-					
+				// assign unique file to file path
+				for (_cas_id, (file_path_id, file_id)) in cas_id_lookup.iter() {
 				  block_on(
 				    db.file_path()
 				      .find_unique(file_path::id::equals(file_path_id.clone()))
 				      .update(vec![
-				        file_path::file_id::set(Some(file_id))
+				        file_path::file_id::set(Some(file_id.clone()))
 				      ])
 				      .exec()
 				  ).unwrap();
 				}
-
+				// handle cursor
 				let last_row = file_paths.last().unwrap();
-
 				cursor = last_row.id;
 				completed += 1;
+				// update progress
 				ctx.progress(vec![
 				  JobReportUpdate::CompletedTaskCount(completed),
 				  JobReportUpdate::Message(format!(
@@ -199,9 +196,10 @@ pub async fn get_orphan_file_paths(
 }
 
 pub fn prepare_file_values(
+	id: &i32,
 	location_path: &str,
 	file_path: &file_path::Data,
-) -> Result<(String, [PrismaValue; 2]), io::Error> {
+) -> Result<(String, [PrismaValue; 3]), io::Error> {
 	let path = Path::new(&location_path).join(Path::new(file_path.materialized_path.as_str()));
 	// println!("Processing file: {:?}", path);
 	let metadata = fs::metadata(&path)?;
@@ -216,5 +214,5 @@ pub fn prepare_file_values(
 		}
 	};
 
-	Ok((cas_id.clone(), [PrismaValue::String(cas_id), PrismaValue::Int(size.try_into().unwrap_or(0))]))
+	Ok((cas_id.clone(), [PrismaValue::Int(id.clone().into()), PrismaValue::String(cas_id), PrismaValue::Int(size.try_into().unwrap_or(0))]))
 }
