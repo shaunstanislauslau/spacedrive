@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-use std::{fs, io};
-use std::path::Path;
+use super::checksum::generate_cas_id;
 use crate::job::JobReportUpdate;
-use crate::prisma::file;
+use crate::prisma::{file, PrismaClient};
 use crate::sys::get_location;
 use crate::{
 	file::FileError,
@@ -13,9 +11,11 @@ use crate::{
 use futures::executor::block_on;
 use prisma_client_rust::prisma_models::PrismaValue;
 use prisma_client_rust::raw::Raw;
-use prisma_client_rust::{raw, Direction};
+use prisma_client_rust::{raw, Direction, Error};
 use serde::{Deserialize, Serialize};
-use super::checksum::generate_cas_id;
+use std::path::Path;
+use std::sync::Arc;
+use std::{fs, io};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FileCreated {
@@ -43,7 +43,7 @@ impl Job for FileIdentifierJob {
 
 		let total_count = count_orphan_file_paths(&ctx.core_ctx, location.id.into()).await?;
 		println!("Found {} orphan file paths", total_count);
-		
+
 		// Chunk the file paths into batches of 100
 		let task_count = (total_count as f64 / 100f64).ceil() as usize;
 		println!("Will process {} tasks", task_count);
@@ -56,12 +56,12 @@ impl Job for FileIdentifierJob {
 		let _ctx = tokio::task::spawn_blocking(move || {
 			let mut completed: usize = 0;
 			let mut cursor: i32 = 1;
-			// map cas_id to file_path ids
-			let mut cas_id_lookup: HashMap<String, (i32, i32)> = HashMap::new();
+			let mut file_path_to_file: Vec<(i32, i32, String)> = Vec::new();
 
 			while completed < task_count {
 				// get the orphan file paths
 				let file_paths = block_on(get_orphan_file_paths(&ctx.core_ctx, cursor)).unwrap();
+
 				println!(
 					"Processing {:?} orphan files. ({} completed of {})",
 					file_paths.len(),
@@ -74,28 +74,27 @@ impl Job for FileIdentifierJob {
 				struct QueryRes {
 					id: Option<i32>,
 				}
-				let mut next_file_id = match block_on(db
-				._query_raw::<QueryRes>(raw!("SELECT MAX(id) id FROM files")))
-				{
-					Ok(rows) => rows[0].id.unwrap_or(0),
-					Err(e) => panic!("Error querying for next file id: {}", e),
-				};
+				let mut next_file_id =
+					match block_on(db._query_raw::<QueryRes>(raw!("SELECT MAX(id) id FROM files")))
+					{
+						Ok(rows) => rows[0].id.unwrap_or(0),
+						Err(e) => panic!("Error querying for next file id: {}", e),
+					};
 
 				// raw values to be inserted into the database
 				let mut values: Vec<PrismaValue> = Vec::new();
 
 				// prepare unique file values for each file path
 				for file_path in file_paths.iter() {
+					next_file_id += 1;
 					let file_id = next_file_id.clone();
-					println!("Next file id: {}", file_id);
 					// get the values for this unique file
 					match prepare_file_values(&file_id, &location_path, file_path) {
 						Ok((cas_id, data)) => {
-							// add unique file id to cas_id lookup map
-							cas_id_lookup.insert(cas_id, (file_path.id, file_id));
+							// store relation of file path id to file id
+							file_path_to_file.push((file_path.id, file_id, cas_id));
 							// add values to raw query data
 							values.extend(data);
-							next_file_id += 1;
 						}
 						Err(e) => {
 							println!("Error processing file: {}", e);
@@ -108,44 +107,88 @@ impl Job for FileIdentifierJob {
 					break;
 				}
 
-				println!("Inserting {} unique file records ({:?} values)", file_paths.len(), values.len());
+				println!(
+					"Inserting {} unique file records ({:?} values)",
+					file_paths.len(),
+					values.len()
+				);
+
+				let query = format!(
+					"INSERT INTO files (id, cas_id, size_in_bytes) VALUES {} 
+					ON CONFLICT (cas_id) DO NOTHING RETURNING id, cas_id",
+					vec!["({}, {}, {})"; file_paths.len()].join(",")
+				);
+
 				// insert files
-				let files: Vec<FileCreated> = block_on(db._query_raw(Raw::new(
-				  &format!(
-				    "INSERT INTO files (id, cas_id, size_in_bytes) VALUES {} ON CONFLICT (cas_id) DO NOTHING RETURNING id, cas_id",
-				    vec!["({}, {}, {})"; file_paths.len()].join(",")
-				  ),
-				  values
-				))).unwrap_or_else(|e| {
-					println!("Error inserting files: {}", e);
-					Vec::new()
-				});
-				
-				println!("Assigning {} unique file ids to origin file_paths", files.len());
+				let files: Vec<FileCreated> = block_on(db._query_raw(Raw::new(&query, values)))
+					.unwrap_or_else(|e| {
+						println!("Error inserting files: {}", e);
+						Vec::new()
+					});
+
+				println!(
+					"Assigning {} unique file ids to origin file_paths",
+					files.len()
+				);
 				// assign unique file to file path
-				for (_cas_id, (file_path_id, file_id)) in cas_id_lookup.iter() {
-				  block_on(
-				    db.file_path()
-				      .find_unique(file_path::id::equals(file_path_id.clone()))
-				      .update(vec![
-				        file_path::file_id::set(Some(file_id.clone()))
-				      ])
-				      .exec()
-				  ).unwrap();
+				for (file_path_id, file_id, cas_id) in file_path_to_file.iter() {
+					match block_on(assign_file(db.clone(), file_path_id, file_id)) {
+						Ok(_) => {}
+						Err(_) => {
+							// if there was already a file record for this cas_id we first search memory for the file id
+							match file_path_to_file.iter().find(|(_, _, cid)| *cid == *cas_id) {
+								Some((_, file_id, cas_id)) => {
+									println!("Found cas_id in memory {}", cas_id);
+									// we attempt again at assigning the file id to the file path
+									match block_on(assign_file(db.clone(), file_path_id, file_id)) {
+										Ok(_) => {}
+										Err(_) => {
+											// in this case there is still a conflict meaning this cas_id is already assigned to another file from outside this process, now we fall back to getting the cas_id from the database
+											println!("Couldn't find cas_id in memory, getting from database...");
+
+											#[derive(Deserialize, Serialize, Debug)]
+											struct FileIdOnly {
+												id: Option<i32>,
+											}
+											let file = block_on(db._query_raw::<FileIdOnly>(raw!(
+												"SELECT id FROM files WHERE cas_id = {}",
+												PrismaValue::String(cas_id.clone())
+											)))
+											.unwrap();
+
+											let id = file[0].id.unwrap();
+
+											block_on(assign_file(db.clone(), file_path_id, &id))
+												.unwrap();
+										}
+									}
+								}
+								None => {
+									println!(
+										"Error assigning file id {} to file path id {}",
+										file_id, file_path_id
+									);
+									continue;
+								}
+							}
+						}
+					}
+
+					// handle cursor
+					let last_row = file_paths.last().unwrap();
+					cursor = last_row.id;
+					completed += 1;
+
+					// update progress
+
+					ctx.progress(vec![
+						JobReportUpdate::CompletedTaskCount(completed),
+						JobReportUpdate::Message(format!(
+							"Processed {} of {} orphan files",
+							completed, task_count
+						)),
+					]);
 				}
-				// handle cursor
-				let last_row = file_paths.last().unwrap();
-				cursor = last_row.id;
-				completed += 1;
-				// update progress
-				ctx.progress(vec![
-				  JobReportUpdate::CompletedTaskCount(completed),
-				  JobReportUpdate::Message(format!(
-				    "Processed {} of {} orphan files",
-				    completed,
-				    task_count
-				  )),
-				]);
 			}
 			ctx
 		})
@@ -159,6 +202,22 @@ impl Job for FileIdentifierJob {
 #[derive(Deserialize, Serialize, Debug)]
 struct CountRes {
 	count: Option<usize>,
+}
+
+pub async fn assign_file(
+	db: Arc<PrismaClient>,
+	file_path_id: &i32,
+	file_id: &i32,
+) -> Result<Option<file_path::Data>, Error> {
+	println!(
+		"Assigning file id {} to file path id {}",
+		file_id, file_path_id
+	);
+	db.file_path()
+		.find_unique(file_path::id::equals(file_path_id.clone()))
+		.update(vec![file_path::file_id::set(Some(file_id.clone()))])
+		.exec()
+		.await
 }
 
 pub async fn count_orphan_file_paths(
@@ -214,5 +273,12 @@ pub fn prepare_file_values(
 		}
 	};
 
-	Ok((cas_id.clone(), [PrismaValue::Int(id.clone().into()), PrismaValue::String(cas_id), PrismaValue::Int(size.try_into().unwrap_or(0))]))
+	Ok((
+		cas_id.clone(),
+		[
+			PrismaValue::Int(id.clone().into()),
+			PrismaValue::String(cas_id),
+			PrismaValue::Int(size.try_into().unwrap_or(0)),
+		],
+	))
 }

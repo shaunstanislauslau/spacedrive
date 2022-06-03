@@ -24,7 +24,7 @@ pub struct Stream {
 #[derive(Debug)]
 pub enum StreamKind {
 	// Video(VideoStream),
-	// Audio(AudioStream),
+// Audio(AudioStream),
 }
 
 #[derive(Debug)]
