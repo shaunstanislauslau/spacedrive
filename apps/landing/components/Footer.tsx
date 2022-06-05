@@ -8,7 +8,7 @@ import {
 } from '@icons-pack/react-simple-icons';
 import React from 'react';
 
-import { ReactComponent as AppLogo } from '../assets/app-logo.svg';
+import { ReactComponent as AppLogo } from '../public/app-logo.svg';
 
 function FooterLink(props: { children: string | JSX.Element; link: string }) {
 	return (

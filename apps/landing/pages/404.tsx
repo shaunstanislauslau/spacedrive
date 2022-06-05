@@ -1,16 +1,12 @@
 import { Button } from '@sd/ui';
 import { SmileyXEyes } from 'phosphor-react';
 import React from 'react';
-import { Helmet } from 'react-helmet';
 
 import Markdown from '../components/Markdown';
 
-function Page() {
+export function Page() {
 	return (
 		<Markdown>
-			<Helmet>
-				<title>Not Found - Spacedrive</title>
-			</Helmet>
 			<div className="flex flex-col items-center">
 				<SmileyXEyes className="mb-3 w-44 h-44" />
 				<h1 className="mb-2 text-center">In the quantum realm this page potentially exists.</h1>
@@ -33,4 +29,12 @@ function Page() {
 	);
 }
 
-export { Page };
+export function onBeforeRender() {
+	return {
+		pageContext: {
+			documentProps: {
+				title: 'Not Found'
+			}
+		}
+	};
+}

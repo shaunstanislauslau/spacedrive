@@ -1,18 +1,11 @@
-import {
-	ClockIcon,
-	CogIcon,
-	HeartIcon,
-	LockClosedIcon,
-	MapIcon,
-	QuestionMarkCircleIcon
-} from '@heroicons/react/solid';
+import { HeartIcon, MapIcon, QuestionMarkCircleIcon } from '@heroicons/react/solid';
 import { Discord, Github } from '@icons-pack/react-simple-icons';
-import { Button, Dropdown } from '@sd/ui';
+import { Dropdown } from '@sd/ui';
 import clsx from 'clsx';
-import { Link, List, MapPin, Question } from 'phosphor-react';
+import { List } from 'phosphor-react';
 import React, { useEffect, useState } from 'react';
 
-import { ReactComponent as AppLogo } from '../assets/app-logo.svg';
+import { ReactComponent as AppLogo } from '../public/app-logo.svg';
 
 function NavLink(props: { link?: string; children: string }) {
 	return (
@@ -27,14 +20,18 @@ function NavLink(props: { link?: string; children: string }) {
 }
 
 export default function NavBar() {
-	const [isAtTop, setIsAtTop] = useState(window.pageYOffset < 20);
+	const [isAtTop, setIsAtTop] = useState(window?.pageYOffset < 20);
 
 	function onScroll(event: Event) {
+		if (!window) return;
+
 		if (window.pageYOffset < 20) setIsAtTop(true);
 		else if (isAtTop) setIsAtTop(false);
 	}
 
 	useEffect(() => {
+		if (!window) return;
+
 		window.addEventListener('scroll', onScroll);
 		return () => window.removeEventListener('scroll', onScroll);
 	}, []);

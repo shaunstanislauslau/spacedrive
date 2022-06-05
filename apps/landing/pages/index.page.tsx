@@ -1,14 +1,9 @@
-import { Apple, Github, Linux, Windows } from '@icons-pack/react-simple-icons';
-import { Button, Input } from '@sd/ui';
 import clsx from 'clsx';
-import React, { useEffect } from 'react';
-import { useState } from 'react';
+import React from 'react';
 
 import AppEmbed from '../components/AppEmbed';
 import { Bubbles } from '../components/Bubbles';
-import { Footer } from '../components/Footer';
 import HomeCTA from '../components/HomeCTA';
-import NavBar from '../components/NavBar';
 import NewBanner from '../components/NewBanner';
 
 interface SectionProps {
@@ -43,7 +38,7 @@ function Section(props: SectionProps = { orientation: 'left' }) {
 	);
 }
 
-function Page() {
+export function Page() {
 	return (
 		<>
 			<div className="mt-22 lg:mt-28" id="content" aria-hidden="true" />
@@ -91,5 +86,3 @@ function Page() {
 		</>
 	);
 }
-
-export { Page };

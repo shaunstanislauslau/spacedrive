@@ -1,16 +1,11 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
 import { ReactComponent as Content } from '~/docs/product/credits.md';
 
 import Markdown from '../components/Markdown';
 
-function Page() {
+export function Page() {
 	return (
 		<Markdown>
-			<Helmet>
-				<title>Our Team - Spacedrive</title>
-				<meta name="description" content="Who's behind Spacedrive?" />
-			</Helmet>
 			<div className="team-page">
 				<Content />
 			</div>
@@ -18,4 +13,13 @@ function Page() {
 	);
 }
 
-export { Page };
+export function onBeforeRender() {
+	return {
+		pageContext: {
+			documentProps: {
+				title: 'Our Team - Spacedrive',
+				description: "Who's behind Spacedrive?"
+			}
+		}
+	};
+}
