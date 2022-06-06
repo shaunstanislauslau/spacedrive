@@ -5,8 +5,8 @@ import type { PageContextBuiltIn } from 'vite-plugin-ssr';
 
 import '@sd/ui/style';
 
-import '../style.scss';
 import { PageContainer } from './PageContainer';
+import './style.scss';
 import type { PageContext } from './types';
 
 export const passToClient = ['pageProps', 'urlPathname'];
