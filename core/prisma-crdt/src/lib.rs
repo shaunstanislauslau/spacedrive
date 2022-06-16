@@ -1,14 +1,18 @@
-pub mod many_relation;
-pub mod shared_record;
+pub mod generator;
+pub mod local;
+pub mod owned;
+pub mod relation;
+pub mod shared;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use uhlc::NTP64;
 
-pub use many_relation::*;
-pub use shared_record::*;
-use uhlc::Timestamp;
+pub use owned::*;
+pub use relation::*;
+pub use shared::*;
 
-pub type Id = u32;
+pub type Id = Vec<u8>;
 
 /// An operation on a CRDT - either a shared record or a many relation.
 /// All CRDT operations record the `node` and `timestamp` the associated with them.
@@ -19,16 +23,17 @@ pub type Id = u32;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CRDTOperation {
 	pub node: Id,
-	pub timestamp: Timestamp, // HLC
+	pub timestamp: NTP64, // HLC
 	#[serde(flatten)]
 	pub typ: CRDTOperationType,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum CRDTOperationType {
-	SharedRecord(SharedRecordOperation),
-	ManyRelation(ManyRelationOperation),
+	Shared(SharedOperation),
+	Relation(RelationOperation),
+	Owned(OwnedOperation),
 }
 
 pub struct CRDTStore<Database> {

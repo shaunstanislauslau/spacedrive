@@ -5,6 +5,7 @@ members = [
 	"core",
 	"core/prisma",
 	"core/derive",
-	"core/sql-crdt",
+	"core/prisma-crdt",
+	"core/prisma-crdt/example",
 	"apps/server"
 ]

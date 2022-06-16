@@ -22,15 +22,15 @@ use crate::{Id, SerializedField};
 /// ## Delete
 /// Deleting a shared record uses the operation's `record_id` and `model` to identify the record and delete.
 #[derive(Serialize, Deserialize, Clone)]
-pub struct SharedRecordOperation {
+pub struct SharedOperation {
 	pub record_id: Id, // Uuid,
 	pub model: String,
 	#[serde(flatten)]
-	pub data: SharedRecordOperationData,
+	pub data: SharedOperationData,
 }
 
-impl SharedRecordOperation {
-	fn new(record_id: Id, model: String, data: SharedRecordOperationData) -> Self {
+impl SharedOperation {
+	fn new(record_id: Id, model: String, data: SharedOperationData) -> Self {
 		Self {
 			record_id,
 			model,
@@ -39,33 +39,33 @@ impl SharedRecordOperation {
 	}
 
 	pub fn new_create(record_id: Id, model: &str, data: Map<String, Value>) -> Self {
-		SharedRecordOperation::new(
+		SharedOperation::new(
 			record_id,
 			model.to_string(),
-			SharedRecordOperationData::Create { data },
+			SharedOperationData::Create { data },
 		)
 	}
 
 	pub fn new_update(record_id: Id, model: &str, field: String, value: Value) -> Self {
-		SharedRecordOperation::new(
+		SharedOperation::new(
 			record_id,
 			model.to_string(),
-			SharedRecordOperationData::Update { field, value },
+			SharedOperationData::Update { field, value },
 		)
 	}
 
 	pub fn new_delete(record_id: Id, model: &str) -> Self {
-		SharedRecordOperation::new(
+		SharedOperation::new(
 			record_id,
 			model.to_string(),
-			SharedRecordOperationData::Delete,
+			SharedOperationData::Delete,
 		)
 	}
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
-pub enum SharedRecordOperationData {
+pub enum SharedOperationData {
 	Create { data: Map<String, Value> },
 	Update { field: String, value: Value },
 	Delete,
@@ -82,7 +82,7 @@ pub trait SharedRecord {
 		id: Id,
 		required_fields: Self::RequiredFields,
 		fields: Vec<Self::Field>,
-	) -> SharedRecordOperation;
-	fn update_operation(id: Id, fields: Self::Field) -> SharedRecordOperation;
-	fn delete_operation(id: Id) -> SharedRecordOperation;
+	) -> SharedOperation;
+	fn update_operation(id: Id, field: Self::Field) -> SharedOperation;
+	fn delete_operation(id: Id) -> SharedOperation;
 }

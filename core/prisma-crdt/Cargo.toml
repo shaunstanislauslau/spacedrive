@@ -1,17 +1,22 @@
 [package]
-name = "sql-crdt"
+name = "prisma-crdt"
 version = "0.1.0"
 edition = "2021"
 
-[[test]]
-name = "sql-crdt"
-path = "tests/lib.rs"
-harness = true
+# [[test]]
+# name = "prisma-crdt"
+# path = "tests/lib.rs"
+# harness = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = "0.1.56"
+futures = "0.3.21"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
+tokio = { version = "1.18.2", features = ["rt", "macros"] }
 uhlc = { version = "0.4.1" }
 uuid = { version = "1.1.0", features = ["serde", "v4"] }
+
+prisma-client-rust-sdk = { git = "https://github.com/Brendonovich/prisma-client-rust", branch = "sdk" }

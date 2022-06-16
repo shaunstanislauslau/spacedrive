@@ -26,6 +26,7 @@ pub mod node;
 #[cfg(target_os = "p2p")]
 pub mod p2p;
 pub mod prisma;
+// pub mod prisma_crdt;
 pub mod sync;
 pub mod sys;
 pub mod util;

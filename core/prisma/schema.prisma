@@ -8,6 +8,12 @@ generator client {
     output   = "../src/prisma.rs"
 }
 
+generator crdt {
+    provider = "cargo prisma-crdt"
+    output   = "../src/_prisma-crdt.rs"
+}
+
+/// @owned
 model Migration {
     id            Int      @id @default(autoincrement())
     name          String
@@ -18,23 +24,45 @@ model Migration {
     @@map("_migrations")
 }
 
-model SyncEvent {
-    id        Int     @id @default(autoincrement())
-    node_id   Int
-    timestamp String
+/// @local
+model SharedOperation {
+    id        Int    @id @default(autoincrement())
+    node_id   Bytes
+    timestamp Bytes
     // individual record pub id OR compound many-to-many pub ids
     record_id String
-    // the type of operation, I.E: CREATE, UPDATE, DELETE as an enum
-    kind      Int
-    // the column name for atomic update operations
-    column    String?
+    // the type of operation - c, u{field name}, d
+    kind      String
     // the new value for create/update operations, msgpack encoded
-    value     String
+    data      Bytes
 
     node Node @relation(fields: [node_id], references: [id])
-    @@map("sync_events")
+
+    @@map("shared_operation")
 }
 
+/// @local
+model RelationOperation {
+    // Metadata
+    id        Int   @id @default(autoincrement())
+    node_id   Bytes
+    timestamp Bytes
+
+    // Identifies the targeted relation record
+    relation_item  Bytes
+    relation_group Bytes
+    relation       String
+
+    // the type of operation - c, u{field name}, d
+    kind String
+    data Bytes
+
+    node Node @relation(fields: [node_id], references: [id])
+
+    @@map("relation_operation")
+}
+
+/// @shared
 model Library {
     id           Int      @id @default(autoincrement())
     pub_id       String   @unique
@@ -46,6 +74,7 @@ model Library {
     @@map("libraries")
 }
 
+/// @local
 model LibraryStatistics {
     id                   Int      @id @default(autoincrement())
     date_captured        DateTime @default(now())
@@ -61,6 +90,7 @@ model LibraryStatistics {
     @@map("library_statistics")
 }
 
+/// @owned
 model Node {
     id           Int      @id @default(autoincrement())
     pub_id       String   @unique
@@ -77,6 +107,7 @@ model Node {
     @@map("nodes")
 }
 
+/// @owned
 model Volume {
     id                    Int      @id() @default(autoincrement())
     node_id               Int
@@ -93,6 +124,7 @@ model Volume {
     @@map("volumes")
 }
 
+// @owned
 model Location {
     id                 Int      @id @default(autoincrement())
     pub_id             String   @unique
@@ -111,6 +143,7 @@ model Location {
     @@map("locations")
 }
 
+/// @shared
 model File {
     id                 Int      @id @default(autoincrement())
     // content addressable storage id - sha256
@@ -120,7 +153,7 @@ model File {
     integrity_checksum String?  @unique
     // basic metadata
     kind               Int      @default(0)
-    size_in_bytes      String
+    size_in_bytes      String   @default("0")
     key_id             Int?
     // handy ways to mark a file
     hidden             Boolean  @default(false)
@@ -153,21 +186,31 @@ model File {
     @@map("files")
 }
 
+/// @owned
 model FilePath {
-    id                Int     @id @default(autoincrement())
-    is_dir            Boolean @default(false)
+    id Int
+
     // location that owns this path
-    location_id       Int
+    location_id Int
+    location    Location? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    // the unique File for this file path
+    file_id Int?
+    file    File? @relation(fields: [file_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    // the parent in the file tree
+    parent_id Int?
+    parent    FilePath? @relation("directory_file_paths", fields: [location_id, parent_id], references: [location_id, id])
+
+    key_id Int? // replacement for encryption
+    key    Key? @relation(fields: [key_id], references: [id])
+
+    is_dir            Boolean @default(false)
     // a path generated from local file_path ids eg: "34/45/67/890"
     materialized_path String
     // the name and extension
     name              String
     extension         String?
-    // the unique File for this file path
-    file_id           Int?
-    // the parent in the file tree
-    parent_id         Int?
-    key_id            Int? // replacement for encryption
     // permissions       String?
     // temp_cas_id       String? // so a filepath can be created without its File, as they're created lazily
 
@@ -175,13 +218,9 @@ model FilePath {
     date_modified DateTime @default(now())
     date_indexed  DateTime @default(now())
 
-    file     File?      @relation(fields: [file_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-    location Location?  @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-    parent   FilePath?  @relation("directory_file_paths", fields: [parent_id], references: [id])
     children FilePath[] @relation("directory_file_paths")
 
-    key Key? @relation(fields: [key_id], references: [id])
-
+    @@id([location_id, id])
     @@unique([location_id, materialized_path, name, extension])
     @@map("file_paths")
 }
@@ -196,6 +235,7 @@ model FileConflict {
 
 // keys allow us to know exactly which files can be decrypted with a given key
 // they can be "mounted" to a client, and then used to decrypt files automatically
+/// @shared
 model Key {
     id           Int       @id @default(autoincrement())
     // used to identify the key when it is entered by user
@@ -211,6 +251,7 @@ model Key {
     @@map("keys")
 }
 
+/// @shared
 model MediaData {
     id                      Int     @id
     pixel_width             Int?
@@ -231,10 +272,12 @@ model MediaData {
     @@map("media_data")
 }
 
+/// @shared
 model Tag {
-    id              Int      @id @default(autoincrement())
-    pub_id          String   @unique
-    name            String?
+    id     Int   @id @default(autoincrement())
+    pub_id Bytes @unique
+
+    name            String   @default("")
     total_files     Int?     @default(0)
     redundancy_goal Int?     @default(1)
     date_created    DateTime @default(now())
@@ -244,6 +287,9 @@ model Tag {
     @@map("tags")
 }
 
+type Uuid = Bytes
+
+/// @relation(item: file_id, group: tag_id)
 model TagOnFile {
     date_created DateTime @default(now())
 
@@ -257,6 +303,7 @@ model TagOnFile {
     @@map("tags_on_files")
 }
 
+/// @shared
 model Label {
     id            Int      @id @default(autoincrement())
     pub_id        String   @unique
@@ -268,6 +315,7 @@ model Label {
     @@map("labels")
 }
 
+/// @relation(item: file_id, group: label_id)
 model LabelOnFile {
     date_created DateTime @default(now())
 
@@ -281,6 +329,7 @@ model LabelOnFile {
     @@map("label_on_files")
 }
 
+/// @owned
 model Job {
     id      String @id
     name    String
@@ -298,6 +347,7 @@ model Job {
     @@map("jobs")
 }
 
+/// @shared
 model Album {
     id        Int     @id @default(autoincrement())
     pub_id    String  @unique
@@ -312,6 +362,7 @@ model Album {
     @@map("albums")
 }
 
+/// @relation(item: file_id, group: album_id)
 model FileInAlbum {
     date_created DateTime @default(now())
 
@@ -325,6 +376,7 @@ model FileInAlbum {
     @@map("files_in_albums")
 }
 
+/// @shared
 model Comment {
     id            Int      @id @default(autoincrement())
     pub_id        String   @unique

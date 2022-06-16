@@ -1,5 +1,6 @@
 [alias]
 prisma = "run -p prisma-cli --"
+prisma-crdt = "run -p prisma-crdt --"
 
 [target.x86_64-apple-darwin]
 rustflags = [

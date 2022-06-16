@@ -1,0 +1,144 @@
+datasource db {
+    provider = "sqlite"
+    url      = "file:dev.db"
+}
+
+generator client {
+    provider = "cargo prisma"
+    output   = "../src/prisma.rs"
+}
+
+// generator crdt {
+//     provider = "cargo prisma-crdt"
+//     output   = "../src/_prisma-crdt.rs"
+// }
+
+/// @local
+model OwnedOperation {
+    id        Int   @id @default(autoincrement())
+    timestamp Bytes
+    data      Bytes
+
+    node_id Int
+    node    Node @relation(fields: [node_id], references: [local_id])
+
+    @@map("shared_operations")
+}
+
+/// @local
+model SharedOperation {
+    id        Int   @id @default(autoincrement())
+    timestamp Bytes
+    record_id Bytes
+
+    // the type of operation - c, u{field name}, d
+    kind String
+    data Bytes
+
+    node_id Int
+    node    Node @relation(fields: [node_id], references: [local_id])
+
+    @@map("relation_operation")
+}
+
+/// @local
+model RelationOperation {
+    id        Int   @id @default(autoincrement())
+    timestamp Bytes
+
+    relation       String
+    relation_item  Bytes
+    relation_group Bytes
+
+    kind String
+    data Bytes
+
+    node_id Int
+    node    Node @relation(fields: [node_id], references: [local_id])
+}
+
+/// @local(id: id)
+model Node {
+    local_id Int   @id @default(autoincrement())
+    id       Bytes @unique
+
+    name String
+
+    locations Location[]
+
+    owned_operations    OwnedOperation[]
+    shared_operations   SharedOperation[]
+    relation_operations RelationOperation[]
+
+    @@map("nodes")
+}
+
+// @owned(owner: node, id: id)
+model Location {
+    local_id Int   @id @default(autoincrement())
+    id       Bytes @unique
+
+    node_id Int
+    node    Node @relation(fields: [node_id], references: [local_id]) /// @node
+
+    name String
+
+    file_paths FilePath[]
+
+    @@map("locations")
+}
+
+/// @owned(owner: location)
+model FilePath {
+    id Int
+
+    location_id Int
+    location    Location @relation(fields: [location_id], references: [local_id])
+
+    parent_id Int?
+    parent    FilePath? @relation("directory_file_paths", fields: [location_id, parent_id], references: [location_id, id])
+
+    file_id Int?
+    File    File? @relation(fields: [file_id], references: [local_id])
+
+    name String
+
+    children FilePath[] @relation("directory_file_paths")
+
+    @@id([location_id, id])
+    @@map("file_paths")
+}
+
+/// @shared(id: cas_id)
+model File {
+    local_id Int   @id @default(autoincrement())
+    cas_id   Bytes @unique
+
+    file_paths FilePath[]
+    TagOnFile  TagOnFile[]
+
+    @@map("files")
+}
+
+/// @shared
+model Tag {
+    local_id Int   @id @default(autoincrement())
+    id       Bytes @unique /// @sync_id()
+
+    name String @default("")
+
+    TagOnFile TagOnFile[]
+    @@map("tags")
+}
+
+/// @relation(item: file, group: tag)
+model TagOnFile {
+    tag_id Int
+    tag    Tag @relation(fields: [tag_id], references: [local_id])
+
+    file_id Int
+    file    File @relation(fields: [file_id], references: [local_id])
+
+    @@id([tag_id, file_id])
+    @@map("tags_on_files")
+}
